@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -10,11 +12,16 @@ import (
 )
 
 var templates = template.Must(template.ParseFiles("edit.html", "view.html"))
-var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+var validPath = regexp.MustCompile("^/(edit|save|view|get)/([a-zA-Z0-9]+)$")
 
 type Page struct {
 	Title string
 	Body  []byte
+}
+
+type ExportedPage struct {
+	Title string
+	Body  string
 }
 
 func (p *Page) save() error {
@@ -87,9 +94,22 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/view/"+title, http.StatusFound)
 }
 
+func getHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Get reçu")
+	w.Header().Set("Content-Type", "application/json")
+	title, err := getTitle(w, r)
+	if err != nil {
+		return
+	}
+	p, _ := loadPage(title) //TODO take care of the error
+	var payload ExportedPage = ExportedPage{Title: title, Body: string(p.Body[:len(p.Body)])}
+	json.NewEncoder(w).Encode(payload)
+}
+
 func main() {
 	http.HandleFunc("/view/", viewHandler)
 	http.HandleFunc("/edit/", editHandler)
 	http.HandleFunc("/save/", saveHandler)
+	http.HandleFunc("/get/", getHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
